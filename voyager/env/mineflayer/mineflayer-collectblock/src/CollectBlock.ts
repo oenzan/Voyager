@@ -68,11 +68,13 @@ async function collectAll(
                             // @ts-ignore
                         } else if (err.name === "NoItem") {
                             const properties =
-                                bot.registry.blocksByName[closest.name];
+                                bot.registry.blocksByName[closest.name as string];
                             const leastTool = Object.keys(
+                                // @ts-ignore
                                 properties.harvestTools
                             )[0];
-                            const item = bot.registry.items[leastTool];
+                            // @ts-ignore
+                            const item = bot.registry.items[leastTool]
                             bot.chat(
                                 `I need at least a ${item.name} to mine ${closest.name}!  Skip it!`
                             );

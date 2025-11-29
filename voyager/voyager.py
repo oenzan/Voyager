@@ -17,16 +17,17 @@ from .agents import SkillManager
 class Voyager:
     def __init__(
         self,
+        bot_name: str = "VoyagerBot",
         mc_port: int = None,
         azure_login: Dict[str, str] = None,
         server_port: int = 3000,
         openai_api_key: str = None,
         env_wait_ticks: int = 20,
         env_request_timeout: int = 600,
-        max_iterations: int = 160,
+        max_iterations: int = 300,
         reset_placed_if_failed: bool = False,
-        action_agent_model_name: str = "gpt-4",
-        action_agent_temperature: float = 0,
+        action_agent_model_name: str = "gpt-5-nano-2025-08-07",
+        action_agent_temperature: float = 1,
         action_agent_task_max_retries: int = 4,
         action_agent_show_chat_log: bool = True,
         action_agent_show_execution_error: bool = True,
@@ -39,9 +40,9 @@ class Voyager:
         r"|cobblestone|dirt|coal|.*_pickaxe|.*_sword|.*_axe",
         curriculum_agent_mode: str = "auto",
         critic_agent_model_name: str = "gpt-4",
-        critic_agent_temperature: float = 0,
+        critic_agent_temperature: float = 1,
         critic_agent_mode: str = "auto",
-        skill_manager_model_name: str = "gpt-3.5-turbo",
+        skill_manager_model_name: str = "gpt-5-nano-2025-08-07",
         skill_manager_temperature: float = 0,
         skill_manager_retrieval_top_k: int = 5,
         openai_api_request_timeout: int = 240,
@@ -100,58 +101,86 @@ class Voyager:
         :param skill_library_dir: skill library dir
         :param resume: whether to resume from checkpoint
         """
+        self.bot_name = bot_name
+        self.current_status = "Idle"
         # init env
+        print("🚀 VoyagerENV Başlatılıyor...")
         self.env = VoyagerEnv(
             mc_port=mc_port,
             azure_login=azure_login,
             server_port=server_port,
             request_timeout=env_request_timeout,
+            bot_name=self.bot_name,
+            log_path=f"./logs/{self.bot_name}",
         )
+        print("🚀 VoyagerENV Başlatıldı.")
+
         self.env_wait_ticks = env_wait_ticks
         self.reset_placed_if_failed = reset_placed_if_failed
         self.max_iterations = max_iterations
 
         # set openai api key
         os.environ["OPENAI_API_KEY"] = openai_api_key
-
+        try:
         # init agents
-        self.action_agent = ActionAgent(
-            model_name=action_agent_model_name,
-            temperature=action_agent_temperature,
-            request_timout=openai_api_request_timeout,
-            ckpt_dir=ckpt_dir,
-            resume=resume,
-            chat_log=action_agent_show_chat_log,
-            execution_error=action_agent_show_execution_error,
-        )
+            self.action_agent = ActionAgent(
+                model_name=action_agent_model_name,
+                temperature=action_agent_temperature,
+                request_timout=openai_api_request_timeout,
+                ckpt_dir=ckpt_dir,
+                resume=resume,
+                chat_log=action_agent_show_chat_log,
+                execution_error=action_agent_show_execution_error,
+            )
+        except Exception as e:
+            print(f"❌ [{self.bot_name}] Action Agent Başlatma Hatası: {e}", flush=True)
+            raise e
+        
         self.action_agent_task_max_retries = action_agent_task_max_retries
-        self.curriculum_agent = CurriculumAgent(
-            model_name=curriculum_agent_model_name,
-            temperature=curriculum_agent_temperature,
-            qa_model_name=curriculum_agent_qa_model_name,
-            qa_temperature=curriculum_agent_qa_temperature,
-            request_timout=openai_api_request_timeout,
-            ckpt_dir=ckpt_dir,
-            resume=resume,
-            mode=curriculum_agent_mode,
-            warm_up=curriculum_agent_warm_up,
-            core_inventory_items=curriculum_agent_core_inventory_items,
-        )
-        self.critic_agent = CriticAgent(
-            model_name=critic_agent_model_name,
-            temperature=critic_agent_temperature,
-            request_timout=openai_api_request_timeout,
-            mode=critic_agent_mode,
-        )
-        self.skill_manager = SkillManager(
-            model_name=skill_manager_model_name,
-            temperature=skill_manager_temperature,
-            retrieval_top_k=skill_manager_retrieval_top_k,
-            request_timout=openai_api_request_timeout,
-            ckpt_dir=skill_library_dir if skill_library_dir else ckpt_dir,
-            resume=True if resume or skill_library_dir else False,
-        )
-        self.recorder = U.EventRecorder(ckpt_dir=ckpt_dir, resume=resume)
+        # try:
+        #     self.curriculum_agent = CurriculumAgent(
+        #         model_name=curriculum_agent_model_name,
+        #         temperature=curriculum_agent_temperature,
+        #         qa_model_name=curriculum_agent_qa_model_name,
+        #         qa_temperature=curriculum_agent_qa_temperature,
+        #         request_timout=openai_api_request_timeout,
+        #         ckpt_dir=ckpt_dir,
+        #         resume=resume,
+        #         mode=curriculum_agent_mode,
+        #         warm_up=curriculum_agent_warm_up,
+        #         core_inventory_items=curriculum_agent_core_inventory_items,
+        #     )
+        # except Exception as e:
+        #     print(f"❌ [{self.bot_name}] Curriculum Agent Başlatma Hatası: {e}", flush=True)
+        #     raise e
+        try:
+            self.critic_agent = CriticAgent(
+                model_name=critic_agent_model_name,
+                temperature=critic_agent_temperature,
+                request_timout=openai_api_request_timeout,
+                mode=critic_agent_mode,
+            )
+        except Exception as e:
+            print(f"❌ [{self.bot_name}] Critic Agent Başlatma Hatası: {e}", flush=True)
+            raise e
+        
+        try:
+            self.skill_manager = SkillManager(
+                model_name=skill_manager_model_name,
+                temperature=skill_manager_temperature,
+                retrieval_top_k=skill_manager_retrieval_top_k,
+                request_timout=openai_api_request_timeout,
+                ckpt_dir=skill_library_dir if skill_library_dir else ckpt_dir,
+                resume=True if resume or skill_library_dir else False,
+            )
+        except Exception as e:
+            print(f"❌ [{self.bot_name}] Skill Manager Başlatma Hatası: {e}", flush=True)
+            raise e
+        try:
+            self.recorder = U.EventRecorder(ckpt_dir=ckpt_dir, resume=resume)
+        except Exception as e:
+            print(f"❌ [{self.bot_name}] Event Recorder Başlatma Hatası: {e}", flush=True)
+            raise e
         self.resume = resume
 
         # init variables for rollout
@@ -161,6 +190,10 @@ class Voyager:
         self.messages = None
         self.conversations = []
         self.last_events = None
+        ### Added for Multi-Agent Global Planner ###
+        self.last_task = None
+        self.last_success = None
+        self.last_critique = ""
 
     def reset(self, task, context="", reset_env=True):
         self.action_agent_rollout_num_iter = 0
@@ -174,7 +207,7 @@ class Voyager:
                 }
             )
         difficulty = (
-            "easy" if len(self.curriculum_agent.completed_tasks) > 15 else "peaceful"
+            # "easy" if len(self.curriculum_agent.completed_tasks) > 15 else "peaceful"
         )
         # step to peek an observation
         events = self.env.step(
@@ -208,14 +241,18 @@ class Voyager:
         self.conversations.append(
             (self.messages[0].content, self.messages[1].content, ai_message.content)
         )
+        print(f"[STEP] ITER={self.action_agent_rollout_num_iter}", flush=True)
         parsed_result = self.action_agent.process_ai_message(message=ai_message)
+        print(f"[STEP] AI MESSAGE ALINDI, uzunluk={len(ai_message.content)}", flush=True)
         success = False
         if isinstance(parsed_result, dict):
+            print("[STEP] parsed_result bir dict, kod çalıştırılacak.", flush=True)
             code = parsed_result["program_code"] + "\n" + parsed_result["exec_code"]
             events = self.env.step(
                 code,
                 programs=self.skill_manager.programs,
             )
+            print(f"[STEP] env.step döndü, event_sayısı={len(events)}", flush=True)
             self.recorder.record(events, self.task)
             self.action_agent.update_chest_memory(events[-1][1]["nearbyChests"])
             success, critique = self.critic_agent.check_task_success(
@@ -225,7 +262,12 @@ class Voyager:
                 chest_observation=self.action_agent.render_chest_observation(),
                 max_retries=5,
             )
-
+            print(f"[STEP] Critic sonucu: success={success} | critique={critique!r}", flush=True)
+            ### Added for Multi-Agent Global Planner ###
+            self.last_task = self.task
+            self.last_success = success
+            self.last_critique = critique
+            ####
             if self.reset_placed_if_failed and not success:
                 # revert all the placing event in the last step
                 blocks = []
@@ -267,6 +309,11 @@ class Voyager:
             self.action_agent_rollout_num_iter >= self.action_agent_task_max_retries
             or success
         )
+        print(
+            f"[STEP] ITER={self.action_agent_rollout_num_iter} | "
+            f"done={done} | success={success}",
+            flush=True,
+        )
         info = {
             "task": self.task,
             "success": success,
@@ -282,15 +329,34 @@ class Voyager:
             print(
                 f"\033[32m****Action Agent human message****\n{self.messages[-1].content}\033[0m"
             )
+            
         return self.messages, 0, done, info
 
     def rollout(self, *, task, context, reset_env=True):
+        print(f"[ROLL OUT] task={task!r} | context={context!r}", flush=True)
         self.reset(task=task, context=context, reset_env=reset_env)
-        while True:
-            messages, reward, done, info = self.step()
-            if done:
-                break
-        return messages, reward, done, info
+
+        self.current_status = "Working"
+
+        iter_idx = 0
+        try:
+            while True:
+                print(f"[ROLL OUT] step() çağrılıyor | iter={iter_idx}", flush=True)
+                messages, reward, done, info = self.step()
+                print(
+                    f"[ROLL OUT] step() döndü | iter={iter_idx} | "
+                    f"done={done} | success={info.get('success')} | task={info.get('task')}",
+                    flush=True,
+                )
+                iter_idx += 1
+                if done:
+                    print(f"[ROLL OUT] DONE TRUE, döngü kırılıyor.", flush=True)
+                    break
+            print(f"[ROLL OUT] RETURN ediliyor.", flush=True)
+            return messages, reward, done, info
+        finally:
+            self.current_status = "Idle"
+
 
     def learn(self, reset_env=True):
         if self.resume:
@@ -409,3 +475,72 @@ class Voyager:
             print(
                 f"\033[35mFailed tasks: {', '.join(self.curriculum_agent.failed_tasks)}\033[0m"
             )
+
+    def get_agent_state(self):
+            """
+            Multi-Agent Global Planner için durum raporu verir.
+            Düzeltme: Recursive (Özyinelemeli) arama ile veriyi bulur.
+            """
+            # 1. Veri yoksa çekmeyi dene
+            if self.last_events is None:
+                try:
+                    self.last_events = self.env.step("") 
+                except Exception as e:
+                    return {"agent_name": self.bot_name, "status": "Error", "error": str(e)}
+
+            # 2. Son 'observe' olayını bul
+            observe_payload = None
+            for event_type, event in reversed(self.last_events):
+                if event_type == "observe":
+                    observe_payload = event
+                    break
+            
+            if observe_payload is None:
+                return {"agent_name": self.bot_name, "status": "Unknown (No Observation)"}
+
+            # --- DÜZELTME: RECURSIVE SÖZLÜK BULUCU ---
+            def find_first_dict(data):
+                # Eğer veri zaten sözlükse, direkt döndür
+                if isinstance(data, dict):
+                    return data
+                # Eğer listeyse, içindeki elemanları tek tek kontrol et
+                if isinstance(data, (list, tuple)):
+                    for item in data:
+                        result = find_first_dict(item)
+                        if result: # Eğer bir sözlük bulunduysa hemen döndür
+                            return result
+                return None
+
+            # Payload'ın içindeki ilk sözlüğü bul
+            data = find_first_dict(observe_payload)
+
+            # Eğer hala bulunamadıysa hata ver
+            if data is None:
+                return {"agent_name": self.bot_name, "status": f"Error (No Dict Found in: {str(observe_payload)[:50]}...)"}
+            # ----------------------------------------
+
+            # 3. Verileri Ayrıştır (Artık data kesinlikle dict)
+            status = data.get("status", {})
+            inventory = data.get("inventory", {})
+            
+            if status is None: status = {}
+            if inventory is None: inventory = {}
+
+            pos = status.get("position", {"x": 0, "y": 0, "z": 0})
+            if pos is None: pos = {"x": 0, "y": 0, "z": 0}
+                
+            clean_pos = [int(pos.get('x', 0)), int(pos.get('y', 0)), int(pos.get('z', 0))]
+
+            return {
+                "agent_name": self.bot_name,
+                "status": self.current_status, 
+                "biome": status.get("biome", "Unknown"),
+                "position": clean_pos,
+                "health": status.get("health", 20),
+                "food": status.get("food", 20),
+                "inventory": inventory, 
+                "equipment": status.get("equipment", {}),
+                "last_task": getattr(self, "last_task", None),
+                "last_success": getattr(self, "last_success", None),
+                "last_critique": getattr(self, "last_critique", ""),
+            }

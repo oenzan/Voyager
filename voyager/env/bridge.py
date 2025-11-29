@@ -23,6 +23,7 @@ class VoyagerEnv(gym.Env):
         server_host="http://127.0.0.1",
         server_port=3000,
         request_timeout=600,
+        bot_name="VoyagerBot",
         log_path="./logs",
     ):
         if not mc_port and not azure_login:
@@ -37,6 +38,7 @@ class VoyagerEnv(gym.Env):
         self.server_port = server_port
         self.request_timeout = request_timeout
         self.log_path = log_path
+        self.bot_name = bot_name
         self.mineflayer = self.get_mineflayer_process(server_port)
         if azure_login:
             self.mc_instance = self.get_mc_instance()
@@ -46,20 +48,25 @@ class VoyagerEnv(gym.Env):
         self.reset_options = None
         self.connected = False
         self.server_paused = False
-
+        
     def get_mineflayer_process(self, server_port):
-        U.f_mkdir(self.log_path, "mineflayer")
-        file_path = os.path.abspath(os.path.dirname(__file__))
-        return SubprocessMonitor(
-            commands=[
-                "node",
-                U.f_join(file_path, "mineflayer/index.js"),
-                str(server_port),
-            ],
-            name="mineflayer",
-            ready_match=r"Server started on port (\d+)",
-            log_path=U.f_join(self.log_path, "mineflayer"),
-        )
+            U.f_mkdir(self.log_path, "mineflayer")
+            file_path = os.path.abspath(os.path.dirname(__file__))
+            
+            return SubprocessMonitor(
+                commands=[
+                    "node",
+                    U.f_join(file_path, "mineflayer/index.js"),
+                    str(server_port),
+                    # --- EKLENECEK KISIMLAR ---
+                    str(self.mc_port),  # Minecraft Portu (25565 vb.)
+                    self.bot_name,      # Bot İsmi (Voyager_Miner vb.)
+                    # --------------------------
+                ],
+                name="mineflayer",
+                ready_match=r"Server started on port (\d+)",
+                log_path=U.f_join(self.log_path, "mineflayer"),
+            )
 
     def get_mc_instance(self):
         print("Creating Minecraft server")
@@ -121,7 +128,7 @@ class VoyagerEnv(gym.Env):
         if res.status_code != 200:
             raise RuntimeError("Failed to step Minecraft server")
         returned_data = res.json()
-        self.pause()
+        # self.pause()
         return json.loads(returned_data)
 
     def render(self):
@@ -141,6 +148,7 @@ class VoyagerEnv(gym.Env):
 
         self.reset_options = {
             "port": self.mc_port,
+            "bot_name": self.bot_name,
             "reset": options.get("mode", "hard"),
             "inventory": options.get("inventory", {}),
             "equipment": options.get("equipment", []),
@@ -158,7 +166,7 @@ class VoyagerEnv(gym.Env):
         self.connected = True
         # All the reset in step will be soft
         self.reset_options["reset"] = "soft"
-        self.pause()
+        # self.pause()
         return json.loads(returned_data)
 
     def close(self):

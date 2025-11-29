@@ -44,6 +44,26 @@ Code:
     10) Do not use `bot.on` or `bot.once` to register event listeners. You definitely do not need them.
     11) Name your function in a meaningful way (can infer the task from the name).
 
+    1. **CRAFTING SAFETY:**
+    - Before calling `craftItem`, YOU MUST check if a `crafting_table` exists nearby.
+    - If not, you MUST locate one, or craft and place one using `placeItem`.
+    - NEVER try to craft complex items (pickaxes, furnace, etc.) without a crafting table.
+
+    2. **TOOL SAFETY:**
+    - Before calling `mineBlock`, CHECK if you have the required tool in inventory.
+    - Do NOT try to mine Stone/Iron/Diamond with your hand.
+    - If you need to equip an item, use `bot.inventory.findInventoryItem` first and CHECK IF IT EXISTS (is not null) before calling `bot.equip`.
+
+    3. **RESOURCE CHECK:**
+    - Before crafting, check if you have the ingredients (e.g., sticks, planks).
+    - If ingredients are missing, craft them first (Recursively).
+
+    4. **CHEST INTERACTION:**
+    - Before depositing/withdrawing, use `bot.findBlock` to ensure a chest is actually there.
+    - Do not assume a chest exists just because the task says so.
+
+    5. **ERROR HANDLING:**
+    - Wrap risky operations (like `equip`, `craft`, `place`) in try-catch blocks or use `if` checks to avoid crashing the bot.
 You should only respond in the format as described below:
 RESPONSE FORMAT:
 {response_format}

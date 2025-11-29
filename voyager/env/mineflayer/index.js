@@ -22,6 +22,14 @@ const app = express();
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: false }));
 
+function resolvePlugin(mod) {
+  if (typeof mod === 'function') return mod;                        // CJS: fn
+  if (mod && typeof mod.plugin === 'function') return mod.plugin;   // CJS: { plugin: fn }
+  if (mod && mod.default && typeof mod.default === 'function') return mod.default;                // ESM default
+  if (mod && mod.default && typeof mod.default.plugin === 'function') return mod.default.plugin;  // ESM default.plugin
+  return null;
+}
+
 app.post("/start", (req, res) => {
     if (bot) onDisconnect("Restarting bot");
     bot = null;
@@ -29,7 +37,7 @@ app.post("/start", (req, res) => {
     bot = mineflayer.createBot({
         host: "localhost", // minecraft server ip
         port: req.body.port, // minecraft server port
-        username: "bot",
+        username: req.body.bot_name,
         disableChatSigning: true,
         checkTimeoutInterval: 60 * 60 * 1000,
     });
@@ -95,17 +103,27 @@ app.post("/start", (req, res) => {
             bot.iron_pickaxe = true;
         }
 
-        const { pathfinder } = require("mineflayer-pathfinder");
-        const tool = require("mineflayer-tool").plugin;
-        const collectBlock = require("mineflayer-collectblock").plugin;
-        const pvp = require("mineflayer-pvp").plugin;
-        const minecraftHawkEye = require("minecrafthawkeye");
-        bot.loadPlugin(pathfinder);
-        bot.loadPlugin(tool);
-        bot.loadPlugin(collectBlock);
-        bot.loadPlugin(pvp);
-        bot.loadPlugin(minecraftHawkEye);
+        // const { pathfinder } = require("mineflayer-pathfinder");
+        // const tool = require('./mineflayer-collectblock/lib/index.js').plugin;
+        // const collectBlock = require("mineflayer-collectblock").plugin;
+        // const pvp = require("mineflayer-pvp").plugin;
+        // const minecraftHawkEye = require("minecrafthawkeye");
+        // bot.loadPlugin(pathfinder);
+        // bot.loadPlugin(tool);
+        // bot.loadPlugin(collectBlock);
+        // bot.loadPlugin(pvp);
+        // bot.loadPlugin(minecraftHawkEye);
 
+        const { pathfinder } = require('mineflayer-pathfinder');
+        const toolRaw    = require('mineflayer-tool');
+        const collectRaw = require('./mineflayer-collectblock/lib/index.js'); // ← senin durumda .plugin var
+        const pvpRaw     = require('mineflayer-pvp');
+        const hawkRaw    = require('minecrafthawkeye');
+
+        // yükle:
+        [pathfinder, resolvePlugin(toolRaw), resolvePlugin(collectRaw), resolvePlugin(pvpRaw), resolvePlugin(hawkRaw)]
+        .filter(Boolean)
+        .forEach(fn => bot.loadPlugin(fn));
         // bot.collectBlock.movements.digCost = 0;
         // bot.collectBlock.movements.placeCost = 0;
 

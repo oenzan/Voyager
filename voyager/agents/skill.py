@@ -22,7 +22,7 @@ class SkillManager:
     ):
         self.llm = ChatOpenAI(
             model_name=model_name,
-            temperature=temperature,
+            # temperature=temperature,
             request_timeout=request_timout,
         )
         U.f_mkdir(f"{ckpt_dir}/skill/code")
@@ -125,3 +125,16 @@ class SkillManager:
         for doc, _ in docs_and_scores:
             skills.append(self.skills[doc.metadata["name"]]["code"])
         return skills
+
+    def get_skill_index(self):
+            """
+            Global Planner için beceri isimlerini ve kısa açıklamalarını döndürür.
+            Bu metot 'programs' property'si gibi tüm kodu döndürmez, sadece özeti döndürür.
+            """
+            skill_text = "AVAILABLE SKILLS:\n"
+            for name, details in self.skills.items():
+                # Açıklamanın sadece ilk cümlesini veya tamamını alalım
+                # Voyager açıklamaları skills.json içinde "description" alanında tutar.
+                desc = details.get("description", "No description available.").split("\n")[0]
+                skill_text += f"- {name}: {desc}\n"
+            return skill_text

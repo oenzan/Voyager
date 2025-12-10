@@ -43,7 +43,8 @@ Code:
     9) Do not write infinite loops or recursive functions.
     10) Do not use `bot.on` or `bot.once` to register event listeners. You definitely do not need them.
     11) Name your function in a meaningful way (can infer the task from the name).
-
+    13)When using mineBlock, NEVER dig straight down. Ensure you do not create a hole you cannot jump out of. If you are deep underground, check if you can find a path back to the surface periodically.
+    
     1. **CRAFTING SAFETY:**
     - Before calling `craftItem`, YOU MUST check if a `crafting_table` exists nearby.
     - If not, you MUST locate one, or craft and place one using `placeItem`.
@@ -54,9 +55,12 @@ Code:
     - Do NOT try to mine Stone/Iron/Diamond with your hand.
     - If you need to equip an item, use `bot.inventory.findInventoryItem` first and CHECK IF IT EXISTS (is not null) before calling `bot.equip`.
 
-    3. **RESOURCE CHECK:**
-    - Before crafting, check if you have the ingredients (e.g., sticks, planks).
-    - If ingredients are missing, craft them first (Recursively).
+    3. **RESOURCE & ENVIRONMENT SATURATION CHECK (CRITICAL):**
+        - **Inventory Check:** First, check if you have the item in your inventory.
+        - **Environment Check:** If the item is a functional block (e.g., `chest`, `furnace`, `crafting_table`), YOU MUST check if it already exists nearby using `bot.findBlock`.
+        - **Decision Logic:** - If found nearby -> **DO NOT CRAFT**. Use the existing block.
+            - If found in inventory -> **DO NOT CRAFT**. Place it.
+            - Only craft if it is missing from BOTH inventory and the nearby world.
 
     4. **CHEST INTERACTION:**
     - Before depositing/withdrawing, use `bot.findBlock` to ensure a chest is actually there.
@@ -64,6 +68,36 @@ Code:
 
     5. **ERROR HANDLING:**
     - Wrap risky operations (like `equip`, `craft`, `place`) in try-catch blocks or use `if` checks to avoid crashing the bot.
+
+    6. **TOOL SAFETY & MANAGEMENT:**
+    - **Tier Check:** Before calling `mineBlock`, DETERMINE the required tool tier (e.g., Stone Pickaxe for Iron, Iron Pickaxe for Diamond).
+    - **Availability Check:** Check if you have the required tool in your inventory.
+    - **Acquisition:** If the tool is MISSING, write code to craft it first (ensure you have materials/crafting table).
+    - **Equip Safety:** When equipping, ALWAYS use `bot.inventory.findInventoryItem` and check if the result is NOT null before calling `bot.equip`.
+
+    7. **TELEPORTATION (FAST TRAVEL):**
+        - You are allowed to use `bot.chat('/tp @s <TargetName>')` or `bot.chat('/tp @s <x> <y> <z>')` to move instantly.
+        - Use this ONLY when the task explicitly asks to "meet", "go to", or "give items to" another agent.
+        - Example: If task is "Give wood to Voyager_Crafter", code: 
+            `bot.chat('/tp @s Voyager_Crafter'); await bot.waitForTicks(20);
+
+    8. **WATER & OXYGEN SAFETY (ANTI-DROWNING):**
+       - **Swim Logic:** If `bot.entity.isInWater` is true, YOU MUST ensure the bot swims up (`bot.setControlState('jump', true)`) to breathe.
+       - **Oxygen Check:** Before and during mining, check `bot.entity.oxygenLevel`. If it is low (< 10), STOP mining and surface immediately.
+       - **Flood Prevention:** Do not mine blocks directly above or next to you if it might release water/lava on top of you.
+
+    9. **SURFACE CHECK & TELEPORT:**
+       - **Wood/Tree Logic:** If tasked to find wood/logs/trees and your Y-coordinate is low (< 60), you are likely underground.
+       - **Action:** BEFORE searching, use `bot.chat('/tp @s ~ ~60 ~')` (teleport up) or check altitude. Trees do not grow in caves!
+       - **Stuck check:** If `exploreUntil` fails repeatedly, assume you are stuck or in the wrong biome/altitude and try to move/teleport to a better starting point.
+
+    10. **RETURN TO BASE (LOGISTICS):**
+       - After finishing a mining/gathering task, DO NOT just stop.
+       - **Action:** You MUST move or teleport back to the team leader (usually 'Voyager_Crafter') or the known base coordinates.
+       - **Code Example:** `await bot.chat('/tp @s Voyager_Crafter');`
+         `await bot.waitForTicks(40);`
+         `// Then find chest and deposit...`
+
 You should only respond in the format as described below:
 RESPONSE FORMAT:
 {response_format}

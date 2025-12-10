@@ -15,6 +15,17 @@ Inventory (xx/36): My final inventory. For mining and smelting tasks, you only n
 Chests: If the task requires me to place items in a chest, you can find chest information here.
 Task: The objective I need to accomplish.
 Context: The context of the task.
+Chat log: The log of the bot's conversation and internal thoughts.
+Execution error: Any errors produced by the code execution.
+
+*** CRITICAL FAILURE LOGIC ***
+1. CHECK CHAT LOGS & ERRORS:
+   - If the Chat Log contains phrases like "Max exploration time reached", "Could not find", "timeout", or "path not found":
+   - Your critique MUST explicitly say: "Resource not found in this area. Exploration failed." or "Agent stuck/failed to pathfind."
+   - Do NOT simply say "Task failed". Explain WHY based on the logs so the planner knows to change location.
+   
+2. PRECONDITION FEEDBACK:
+   - If the bot failed to find wood/stone/iron, your critique should suggest: "Try moving to a new area or biome."
 
 You should only respond in JSON format as described below:
 {

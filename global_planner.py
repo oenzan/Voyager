@@ -7,14 +7,14 @@ from voyager.agents.skill import SkillManager
 from voyager.prompts import load_prompt
 
 class GlobalPlanner:
-    def __init__(self, ckpt_dir, openai_api_key):
+    def __init__(self, ckpt_dir):
         """
         Global Planner: Takımın beyni.
         """
         self.ckpt_dir = ckpt_dir
-        openai.api_key = openai_api_key
-        
-        print("Global Planner: Beceri kütüphanesi yükleniyor...")
+        openai.api_key = os.environ["OPENAI_API_KEY"]
+
+        print("Global Planner: Beceri kütüphanesi yükleniyor.`..")
         
         # SkillManager'ı başlat (Voyager'ın diskteki hafızasını okur)
         self.skill_manager = SkillManager(

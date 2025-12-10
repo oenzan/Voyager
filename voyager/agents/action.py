@@ -14,7 +14,7 @@ from voyager.control_primitives_context import load_control_primitives_context
 class ActionAgent:
     def __init__(
         self,
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-5-mini-2025-08-07",
         temperature=0,
         request_timout=120,
         ckpt_dir="ckpt",
@@ -83,11 +83,11 @@ class ActionAgent:
             "smeltItem",
             "killMob",
         ]
-        if not self.llm.model_name == "gpt-3.5-turbo":
-            base_skills += [
-                "useChest",
-                "mineflayer",
-            ]
+        # if not self.llm.model_name == "gpt-3.5-turbo":
+        base_skills += [
+            "useChest",
+            "mineflayer",
+        ]
         programs = "\n\n".join(load_control_primitives_context(base_skills) + skills)
         response_format = load_prompt("action_response_format")
         system_message_prompt = SystemMessagePromptTemplate.from_template(

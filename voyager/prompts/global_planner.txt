@@ -24,7 +24,22 @@ GLOBAL STRATEGIC CRITERIA
 - If an agent repeatedly fails to find diamonds in a certain area, consider:
   - Reassigning them to a different area at the same Y level, or
   - Changing the global strategy (e.g., use diamonds from chests instead of mining more, or temporarily postpone diamond-related goals).
+- The world follows Minecraft rules regarding elevation (Y-level):
+  * SURFACE (Y > 62): Trees, Animals, Flowers, Grass, Water.
+  * UNDERGROUND (Y < 60): Caves, Iron, Coal, Gold.
+  * DEEP UNDERGROUND (Y < 0): Diamonds, Redstone, Lapis, Deepslate.
 
+- STRATEGIC MOVEMENT:
+  * If an agent is DEEP UNDERGROUND (e.g., Y = -50) and needs WOOD/FOOD:
+    - DO NOT immediately assign "mineWoodLog". The agent will fail to find trees nearby.
+    - INSTEAD, first assign a movement task like "moveToSurface" or "climbUpToSurface".
+  
+  * If an agent is on the SURFACE (e.g., Y = 64) and needs DIAMONDS:
+    - First assign a task to go down, e.g., "digMineshaftToDeepSlate" or "moveToDiamondLevel".
+
+- BIOME AWARENESS:
+  * Trees are found in forests/plains, not in deserts/oceans.
+  * If the biome is "desert", the agent must move to a different biome to find wood.
 2. MINING TIERS (CRITICAL)
 The following mining-tier rules MUST always be respected:
 - To mine **Stone/Coal**, you need at least a **Wooden Pickaxe**.
@@ -100,25 +115,37 @@ For example:
   - "continue"
   to indicate that it should keep executing its current mission rather than being interrupted.
 
-11. TASK GRANULARITY (VERY IMPORTANT):
-   - Each agent's "task" MUST be a SMALL, ATOMIC skill that can reasonably be implemented
-     as a single function in the agent's code.
-   - The "task" string itself MUST:
-     * describe exactly ONE action,
-     * NOT contain the words "and", "then", "after", "before", or symbols like "->" or ";",
-     * NOT be a long natural-language sentence,
-     * usually be short (1–4 words), e.g. "craftChest", "mineWoodLog", "buildWallSegment".
-   - If you catch yourself writing something like:
-       "gather wood and then build a house"
-     as a single task, you MUST split it into multiple tasks assigned over multiple planning
-     rounds (e.g. first "gatherWoodForPlanks", then later "buildSmallHouseShell").
-   - A single task should:
-     * either call ONE existing skill from AVAILABLE SKILLS (e.g., "craftChest", "mineWoodLog"),
-     * or define ONE new small skill that could realistically be implemented as a single
-       function (e.g., "buildDoorwayFrame", "placeInteriorFurniture").
+11. TASK GRANULARITY & NAMING (CRITICAL):
+   - Each agent's "task" MUST be a GENERIC, ATOMIC skill name.
+   - The "task" string MUST:
+      * be a single identifier with NO SPACES (use camelCase or snake_case),
+      * describe exactly ONE action (Action Only),
+      * NOT contain the words "and", "then", "after", "before", "->", ";",
+      * NOT contain the specific goal or reason (e.g., avoid "ForPlanks", "ToBuildHouse").
+   
+   - SEPARATION OF CONCERN:
+      * The "task" field is strictly for the FUNCTION NAME (What to do).
+      * The "purpose" field is for the CONTEXT (Why we are doing it).
+   
+   - REUSABILITY RULE:
+      * Ask yourself: "Can I use this exact same function name later for a completely different goal?"
+      * If the answer is NO, the name is wrong.
+      * Example: "craftPlanksForChests" is BAD because it cannot be used to make sticks.
+      * Example: "craftWoodenPlanks" is GOOD because it can be used for anything.
 
+   - EXAMPLES:
+      * BAD (Too composite): "gatherWoodAndBuildHouse", "craftPlanks->craftChest"
+      * BAD (Context specific): "gatherWoodForPlanks", "mineIronForPickaxe", "craftPlanksForStorage"
+      * GOOD (Generic & Atomic): "mineWoodLog", "craftWoodenPlanks", "craftChest", "buildCobblestoneWall"
 12. If you want an already-working agent to keep doing its current mission,
    assign "continue" as its task instead of creating a new one.
+
+13. LOGISTICS & DIRECT TRANSFER (CRITICAL):
+- **Teleport Delivery:** Instead of using chests, assign a "Delivery Task".
+- **Pattern:** 1. Agent A (Has Item): "Teleport to Agent B and throw [Item] at them."
+  2. Agent B (Needs Item): "Wait and pick up nearby items."
+- **Command:** Use specific instructions like: "teleportAndTossItem(target:'Voyager_Crafter', item:'cobblestone', count:10)"
+
 ========================
 TEAM STATUS FORMAT
 ========================
@@ -231,3 +258,16 @@ EXAMPLES OF BAD VS GOOD TASKS:
   "task": "buildSmallCobblestoneRoom"
   "task": "placeCraftingTableAndFurnace"
   "task": "placeStorageChests"
+
+*** MULTI-AGENT INTERACTION (TELEPORT & TRADE) ***
+1) TELEPORTATION:
+   - You have OP permission. You CAN use `bot.chat('/tp @s TargetPlayerName')` to instantly go to another agent.
+   - Use this when the task requires exchanging items or working together at the same spot.
+   
+2) GIVING ITEMS (DELIVERY):
+   - To give items to another agent:
+     a) FIRST, teleport to them: `bot.chat('/tp @s ' + targetAgentName)`
+     b) WAIT a moment for the chunk to load: `await bot.waitForTicks(20)`
+     c) LOOK AT them (optional but polite): `bot.lookAt(bot.players[targetAgentName].entity.position)`
+     d) TOSS the item: `await bot.toss(mcData.itemsByName[itemName].id, null, count)`
+   - Do NOT try to put items in their inventory directly. Just toss them on the ground near them. They will pick it up automatically.

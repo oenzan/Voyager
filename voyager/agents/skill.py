@@ -13,7 +13,7 @@ from voyager.control_primitives import load_control_primitives
 class SkillManager:
     def __init__(
         self,
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-5-nano-2025-08-07",
         temperature=0,
         retrieval_top_k=5,
         request_timout=120,

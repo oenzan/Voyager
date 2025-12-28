@@ -1,8 +1,8 @@
 import multiprocessing
 import time
-import queue # Empty hatası için
+import queue
 from voyager import Voyager
-from global_planner import GlobalPlanner # Yazdığımız planner sınıfı
+from global_planner import GlobalPlanner
 import os
 
 
@@ -18,9 +18,9 @@ def put_latest(q, payload, agent_name, drop_all=True):
         try:
             if drop_all:
                 while True:
-                    q.get_nowait()      # pending task'leri boşalt
+                    q.get_nowait()
             else:
-                q.get_nowait()          # sadece 1 tane sil
+                q.get_nowait()
         except queue.Empty:
             pass
 
@@ -29,12 +29,10 @@ def put_latest(q, payload, agent_name, drop_all=True):
             print(f"🔁 [GlobalPlanner] {agent_name} queue overwrite -> latest task set.", flush=True)
             return True
         except queue.Full:
-            # Agent aynı anda çekip-bırakırken çok nadiren tekrar dolu yakalanabilir
             print(f"⚠️ [GlobalPlanner] {agent_name} overwrite failed (still full).", flush=True)
             return False
 
 def recover(bot, st, err):
-    # Planner görsün diye state'i fail'e çek
     st["status"] = "Idle"
     st["has_pending_task"] = False
     st["pending_task"] = None
@@ -50,16 +48,16 @@ def recover(bot, st, err):
         except Exception:
             pass
         st["status"] = "Idle"
-        return True   # kurtardım -> aynı botla devam
+        return True
     except Exception:
-        return False  # kurtaramadım -> bot'u yeniden kurmak lazım
+        return False
 
 def run_single_agent(agent_config, task_queue, shared_team_state):
     name = agent_config["name"]
     mc_port = agent_config["mc_port"]
     bridge_port = agent_config["bridge_port"]
     st = shared_team_state[name]
-    print(f"🚀 [PROCESS BAŞLATILDI] Ajan: {name} (Bridge: {bridge_port})", flush=True)
+    print(f"🚀 [PROCESS IS STARTED] Agent: {name} (Bridge: {bridge_port})", flush=True)
     bot = None
     try:
         bot = Voyager(
@@ -78,31 +76,27 @@ def run_single_agent(agent_config, task_queue, shared_team_state):
             st["last_critique"] = "Voyager init failed"
             return
         # --- HANDSHAKE ---
-        print(f"🔌 [{name}] Bağlanıyor...", flush=True)
+        print(f"🔌 [{name}] Connecting ...", flush=True)
         try:
             initial_data = bot.env.reset(options={"mode": "soft", "wait_ticks": 40})
             # bot.env.unpause()
             bot.last_events = [("observe", initial_data)]
-            print(f"✅ [{name}] GİRİŞ BAŞARILI!", flush=True)
+            print(f"✅ [{name}] CONNECTION SUCCESSFUL!", flush=True)
         except Exception as e:
-            print(f"❌ [{name}] BAĞLANTI HATASI: {e}", flush=True)
+            print(f"❌ [{name}] CONNECTION ERROR: {e}", flush=True)
             return
         # -----------------
         bot.current_status = "Idle"
         st = shared_team_state[name]
         st["status"] = "Idle"
-        print(f"🤖 [{name}] Hazır. Döngü Başlıyor...", flush=True)
+        print(f"🤖 [{name}] Ready. Loop Starting...", flush=True)
 
         while True:
-            # 1. DURUM RAPORLA (SENSE) - ARTIK BLOKLAMA YOK!
             try:
-                # Direkt sözlüğe yazıyoruz. Eski veri anında eziliyor.
-                # Queue full hatası asla almazsınız.
                 current_state = bot.get_agent_state()
                 st = shared_team_state[name]   # proxy dict
                 update_proxy(st, current_state)
                 cur_status = getattr(bot, "current_status", st.get("status", "Unknown"))
-                # Pending'i görünür kıl: agent Idle ama queue'da iş varsa Pending göster
                 if st.get("has_pending_task", False) and cur_status == "Idle":
                     st["status"] = "Pending"
                 else:
@@ -112,10 +106,9 @@ def run_single_agent(agent_config, task_queue, shared_team_state):
                       f"| last_task={current_state.get('last_task')} "
                       f"| last_success={current_state.get('last_success')}",
                       flush=True)
-                print(f"⏳ [{name}] Görev bekleniyor...", flush=True)
+                print(f"⏳ [{name}] Waiting for task...", flush=True)
                 task_data = task_queue.get(timeout=2)
-                print(f"📥 [{name}] Yeni Görev Alındı: {task_data}", flush=True)
-                # ... (Geri kalan görev işleme kodu AYNI) ...
+                print(f"📥 [{name}] New Task Received: {task_data}", flush=True)
                 if isinstance(task_data, dict):
                     task = task_data.get("task")
                     purpose = task_data.get("purpose", "")
@@ -143,12 +136,10 @@ def run_single_agent(agent_config, task_queue, shared_team_state):
                             reset_env=True
                         )
                     except Exception as e:
-                        # rollout patladı -> agent hayatta kalsın, planner bunu "fail" görsün
                         bot.current_status = "Idle"
                         st["status"] = "Idle"
                         st["last_success"] = False
                         st["last_critique"] = f"Rollout error: {str(e)}"
-                        # pending zaten False'landı, buradan loop'a dön
                         continue
                     bot.current_status = "Idle"
                     cur = bot.get_agent_state()
@@ -158,12 +149,12 @@ def run_single_agent(agent_config, task_queue, shared_team_state):
                 continue
             except Exception as e:
                 # timeout / transient / rollout crash vs.
-                print(f"❌ [{name}] Döngü Hatası: {e} (Kurtarılıyor...)", flush=True)
+                print(f"❌ [{name}] Loop Error: {e} (Recovering...)", flush=True)
                 ok = False
                 if bot is not None:
                     ok = recover(bot, st, e)
                 if ok:
-                    continue       # aynı botla devam
+                    continue
                 else:
                     st["status"] = "Dead"
                     st["has_pending_task"] = False
@@ -173,7 +164,6 @@ def run_single_agent(agent_config, task_queue, shared_team_state):
                     print(f"💀 [{name}] Recover failed -> process exiting.", flush=True)
                     break
     except Exception as e:
-        # bot daha kurulmadan patladı vs.
         st["status"] = "Dead"
         st["has_pending_task"] = False
         st["pending_task"] = None
@@ -182,7 +172,6 @@ def run_single_agent(agent_config, task_queue, shared_team_state):
         print(f"❌ [{name}] Fatal error: {e}", flush=True)
         return
 
-# --- MAIN PROCESS (PLANNER TARAFI) ---
 if __name__ == '__main__':
     
     try:
@@ -197,13 +186,7 @@ if __name__ == '__main__':
         {"name": "Voyager_Miner", "mc_port": 43781, "bridge_port": 3000},
         {"name": "Voyager_Crafter", "mc_port": 43781, "bridge_port": 3001}
     ]
-
-    # --- ÖNEMLİ DEĞİŞİKLİK: MANAGER KULLANIMI ---
-    # Manager, processler arası paylaşılan veri yapıları oluşturur.
     manager = multiprocessing.Manager()
-
-    # Bu sözlük tüm processler tarafından okunup yazılabilir!
-    # status_queue yerine bunu kullanıyoruz.
     shared_team_state = manager.dict() 
 
     for data in agents_data:
@@ -212,41 +195,33 @@ if __name__ == '__main__':
             "has_pending_task": False,
             "pending_task": None,
         })
-
-    # Görev kuyrukları kalıyor (Çünkü emirler sırayla yapılmalı, kaybolmamalı)
     task_queues = {data["name"]: multiprocessing.Queue(maxsize=1) for data in agents_data}
-
     planner = GlobalPlanner(ckpt_dir="ckpt")
-
     processes = []
     for data in agents_data:
         p = multiprocessing.Process(
             target=run_single_agent, 
-            # status_queue yerine shared_team_state gönderiyoruz
             args=(data, task_queues[data["name"]], shared_team_state) 
         )
         processes.append(p)
         p.start()
-        print(f"⏳[GlobalPlanner] {data['name']} başlatıldı. Diğeri için 15 saniye bekleniyor...")
-        time.sleep(15) # 5 yerine 15 veya 20 yapın ki çakışma olmasın
+        print(f"⏳[GlobalPlanner] {data['name']} started. Waiting 15 seconds for others...")
+        time.sleep(15)
 
-    print("🌍 [GlobalPlanner]Global Planner Devrede. Paylaşılan Hafıza İzleniyor...")
-    
+    print("🌍 [GlobalPlanner] Global Planner is active. Monitoring Shared Memory...")
+
     while True:
-        # A. DURUMLARI OKU (SENSE)
         current_team_snapshot = {k: dict(v) for k, v in shared_team_state.items()}
-        
-        # Sadece durumu (Idle/Working) ve Envanteri çekelim
         team_status_report = {}
         total_inventory = {}
         
         for name, state in current_team_snapshot.items():
-            if isinstance(state, dict): # Bazen hata mesajı string gelebilir, kontrol et
-                print(f"👀[GlobalPlanner] [{name}] Anlık Durum Alıniyor...", flush=True)
+            if isinstance(state, dict): # Sometimes error messages can come as strings, check
+                print(f"👀[GlobalPlanner] [{name}] Fetching Current Status...", flush=True)
                 team_status_report[name] = state.get("status", "Unknown")
-                print(f"👀[GlobalPlanner] [{name}] Anlık Durum Alındı: {state.get('status')}", flush=True)
-                
-                # Envanter birleştirme
+                print(f"👀[GlobalPlanner] [{name}] Current Status Retrieved: {state.get('status')}", flush=True)
+
+                # Inventory merging
                 inv = state.get("inventory", {})
                 if isinstance(inv, dict):
                     for item, count in inv.items():
@@ -254,24 +229,19 @@ if __name__ == '__main__':
 
         # DEBUG
         if team_status_report:
-            print(f"\n👀 Anlık Durum: {team_status_report}")
+            print(f"\n👀 Current Status: {team_status_report}")
 
         # B. PLANLAMA (THINK & ACT)
-        # Eğer rapor veren ajan sayısı ekibe eşitse ve boşta olan varsa
         idle_agents = [n for n, s in team_status_report.items() if s == "Idle"]
         
         if idle_agents and len(team_status_report) == len(agents_data):
-            print(f"🧠[GlobalPlanner] Planlama... (Boştakiler: {idle_agents})")
-            
+            print(f"🧠[GlobalPlanner] Planning... (Idle: {idle_agents})")
             plan = planner.create_plan(
                 main_goal=MAIN_GOAL,
                 agents_status=team_status_report,
                 shared_inventory=total_inventory
             )
-
-            print(f"📜 [GlobalPlanner] Strateji: {plan.get('thought', '...')}")
-
-            # Dağıtım
+            print(f"📜 [GlobalPlanner] Strategy: {plan.get('thought', '...')}")
             assignments = plan.get("assignments", {})
             for agent_name, assignment_data in assignments.items():
                 if isinstance(assignment_data, dict):
@@ -284,7 +254,6 @@ if __name__ == '__main__':
                 if task and task not in ["wait", "continue"]:
                     if agent_name in task_queues:
                         print(f"[GlobalPlanner] outgoing -> {agent_name}: {task}")
-                        #task_queues[agent_name].put({"task": task, "purpose": purpose})
                         if team_status_report.get(agent_name) != "Idle":
                             continue
                         agent_state = current_team_snapshot.get(agent_name, {})
@@ -295,14 +264,10 @@ if __name__ == '__main__':
 
                         success = put_latest(task_queues[agent_name], {"task": task, "purpose": purpose}, agent_name, drop_all=False)
                         if success:
-                            st = shared_team_state[agent_name]  # proxy dict
+                            st = shared_team_state[agent_name]
                             st["has_pending_task"] = True
                             st["pending_task"] = task
-                            # Pending state'i planner tarafında da set et
                             if st.get("status") in ["Idle", "Unknown"]:
                                 st["status"] = "Pending"
         time.sleep(5)
         print("\n-----------------------------\n")
-
-    for p in processes:
-        p.terminate()

@@ -478,48 +478,33 @@ class Voyager:
 
     def get_agent_state(self):
             """
-            Multi-Agent Global Planner için durum raporu verir.
-            Düzeltme: Recursive (Özyinelemeli) arama ile veriyi bulur.
+            Returns a status report for the Multi-Agent Global Planner.
+            Fix: Uses recursive search to locate the data.
             """
-            # 1. Veri yoksa çekmeyi dene
             if self.last_events is None:
                 try:
                     self.last_events = self.env.step("") 
                 except Exception as e:
                     return {"agent_name": self.bot_name, "status": "Error", "error": str(e)}
-
-            # 2. Son 'observe' olayını bul
             observe_payload = None
             for event_type, event in reversed(self.last_events):
                 if event_type == "observe":
                     observe_payload = event
                     break
-            
             if observe_payload is None:
                 return {"agent_name": self.bot_name, "status": "Unknown (No Observation)"}
-
-            # --- DÜZELTME: RECURSIVE SÖZLÜK BULUCU ---
             def find_first_dict(data):
-                # Eğer veri zaten sözlükse, direkt döndür
                 if isinstance(data, dict):
                     return data
-                # Eğer listeyse, içindeki elemanları tek tek kontrol et
                 if isinstance(data, (list, tuple)):
                     for item in data:
                         result = find_first_dict(item)
-                        if result: # Eğer bir sözlük bulunduysa hemen döndür
+                        if result:
                             return result
                 return None
-
-            # Payload'ın içindeki ilk sözlüğü bul
             data = find_first_dict(observe_payload)
-
-            # Eğer hala bulunamadıysa hata ver
             if data is None:
                 return {"agent_name": self.bot_name, "status": f"Error (No Dict Found in: {str(observe_payload)[:50]}...)"}
-            # ----------------------------------------
-
-            # 3. Verileri Ayrıştır (Artık data kesinlikle dict)
             status = data.get("status", {})
             inventory = data.get("inventory", {})
             
